@@ -5,6 +5,7 @@ const User = require('../models/userModel');
 const AppError = require('../utils/appError');
 const catchAsync = require('../utils/catchAsync');
 const sendEmail = require('../utils/email');
+const { findByIdAndDelete } = require('../models/userModel');
 
 const signToken = (id) =>
   jwt.sign({ id }, process.env.JWT_SECRET, {
@@ -60,7 +61,7 @@ exports.signup = catchAsync(async (req, res, next) => {
     'host'
   )}/api/v1/users/confirmEmail/${token}`;
 
-  const message = `open this url to confirm your email ${confirmEmailURL}`;
+  const message = `<h1>open this url to confirm your email</h1> <a href="${confirmEmailURL}"> Click Here </a>`;
 
   const optionsObj = {
     email: newUser.email,
@@ -76,9 +77,10 @@ exports.signup = catchAsync(async (req, res, next) => {
       message: 'Your email confirmation token has been sent to the email',
     });
   } catch (err) {
-    newUser.emailConfirmToken = undefined;
-    newUser.emailConfirmTokenExpires = undefined;
-    await newUser.save({ validateModifiedOnly: true });
+    // newUser.emailConfirmToken = undefined;
+    // newUser.emailConfirmTokenExpires = undefined;
+    // await newUser.save({ validateModifiedOnly: true });
+    await User.findByIdAndDelete(newUser._id);
     return next(new AppError('There was an error sending the email', 500));
   }
 });
@@ -166,6 +168,11 @@ exports.login = catchAsync(async (req, res, next) => {
   });
 });
 
+exports.logout = (req, res) => {
+  createCookie(res, 'Logged out');
+  res.status(200).json({ status: 'success' });
+};
+
 exports.protect = catchAsync(async (req, res, next) => {
   // get token and check if it exists
   let token;
@@ -174,6 +181,7 @@ exports.protect = catchAsync(async (req, res, next) => {
     req.headers.authorization.startsWith('Bearer')
   )
     token = req.headers.authorization.split(' ')[1];
+  else if (req.cookies.jwt) token = req.cookies.jwt;
 
   if (!token)
     return next(new AppError("You aren't logged in, please login first", 401));
@@ -310,17 +318,12 @@ exports.updatePassword = catchAsync(async (req, res, next) => {
 
 exports.updateProfileInfo = catchAsync(async (req, res, next) => {
   // find the user
-  const user = await User.findOne({ email: req.user.email }).select(
-    '+password'
-  );
-
-  // check that the password is correct
-  if (!(await user.correctPassword(req.body.password)))
-    return next(new AppError('Incorrect password', 401));
+  const user = await User.findById(req.user._id);
 
   // update the user info
   if (req.body.email) user.email = req.body.email;
   if (req.body.name) user.name = req.body.name;
+  if (req.file) user.photo = req.file.filename;
 
   await user.save({ validateModifiedOnly: true });
 
@@ -357,7 +360,7 @@ exports.deleteAccount = catchAsync(async (req, res, next) => {
 });
 
 exports.reActivateAccount = catchAsync(async (req, res, next) => {
-  // update the account active to be true to be able to fine the user
+  // update the account active to be true to be able to find the user
   await User.updateOne({ email: req.body.email }, { $set: { active: true } });
   // find the user
   const user = await User.findOne({ email: req.body.email })

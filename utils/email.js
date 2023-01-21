@@ -1,4 +1,5 @@
 const nodemailer = require('nodemailer');
+const htmlToText = require('html-to-text');
 
 const sendEmail = async (options) => {
   // 1) Create a transporter
@@ -17,7 +18,8 @@ const sendEmail = async (options) => {
     from: 'MARWAN YASSER <natours@gmail.com>',
     to: options.email,
     subject: options.subject,
-    text: options.message,
+    // text: htmlToText(options.message),
+    html: options.message,
     // html:
   };
   // 3) Send the EMAIL

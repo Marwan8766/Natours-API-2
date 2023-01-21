@@ -1,8 +1,66 @@
+const { memoryStorage } = require('multer');
+const multer = require('multer');
+const sharp = require('sharp');
 const Tour = require('../models/tourModel');
 // const ApiFeatures = require('../utils/apiFeatures');
 const AppError = require('../utils/appError');
 const catchAsync = require('../utils/catchAsync');
 const factory = require('./handlerFactory');
+
+const multerStorage = memoryStorage();
+
+const multerFilter = (req, file, cb) => {
+  // The function should call `cb` with a boolean
+  // to indicate if the file should be accepted
+
+  if (file.mimetype.startsWith('image'))
+    // To reject this file pass `false`, like so:
+    cb(null, true);
+  // To accept the file pass `true`, like so:
+  else cb(new AppError('Sorry, you can only upload images'), false);
+};
+
+const upload = multer({
+  storage: multerStorage,
+  fileFilter: multerFilter,
+});
+
+exports.uploadTourImages = upload.fields([
+  { name: 'imageCover', maxCount: 1 },
+  { name: 'images', maxCount: 3 },
+]);
+
+exports.resizeTourImages = catchAsync(async (req, res, next) => {
+  if (!req.files) return next();
+
+  // coverImage
+  const imageCoverFileName = `tour-${req.params.id}-cover.jpeg`;
+
+  await sharp(req.files.imageCover[0].buffer)
+    .resize(2000, 1333)
+    .toFormat('jpeg')
+    .jpeg({ quality: 90 })
+    .toFile(`public/img/tours/${imageCoverFileName}`);
+
+  req.body.imageCover = imageCoverFileName;
+
+  // images
+  req.body.images = [];
+  const images = req.files.images.map(async (file, i) => {
+    const fileName = `tour-${req.params.id}-image-${i + 1}.jpeg`;
+
+    await sharp(file.buffer)
+      .resize(2000, 1333)
+      .toFormat('jpeg')
+      .jpeg({ quality: 90 })
+      .toFile(`public/img/tours/${fileName}`);
+
+    req.body.images.push(fileName);
+  });
+
+  await Promise.all(images);
+  next();
+});
 
 exports.aliasTopCheap = (req, res, next) => {
   req.query.limit = '5';

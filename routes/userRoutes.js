@@ -1,7 +1,9 @@
 const express = require('express');
+
 const userController = require('../controllers/userController');
 const authController = require('../controllers/authController');
 ///////////////////
+
 const router = express.Router();
 
 router.post('/signup', authController.signup);
@@ -15,10 +17,17 @@ router.post('/reActivateAccount', authController.reActivateAccount);
 router.use(authController.protect);
 
 router.patch('/updatePassword', authController.updatePassword);
-router.patch('/updateProfileInfo', authController.updateProfileInfo);
+// photo is the name of the field in the form that holds the data we want to upload(image)
+router.patch(
+  '/updateProfileInfo',
+  userController.uploadUserPhoto,
+  userController.resizeUserPhoto,
+  authController.updateProfileInfo
+);
 router.delete('/deleteAccount', authController.deleteAccount);
 router.get('/me', userController.getMe, userController.getUser);
 
+router.route('/logout').get(authController.logout);
 // Only admin can use the following routes after this middleware
 router.use(authController.restrictTo('admin'));
 
